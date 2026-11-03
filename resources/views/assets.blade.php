@@ -312,156 +312,163 @@
             </div>
         </div>
 
-        <!-- Asset List Table & Filters -->
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4 print-shadow-none print-table-container">
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Asset Inventory & QR Codes</h2>
-
-                <div class="flex items-center gap-2 w-full md:w-auto flex-wrap">
-                    <!-- Search & Filter Form -->
-                    <form action="{{ url('/') }}" method="GET" class="flex flex-wrap gap-2 w-full md:w-auto no-print items-center">
-
-                        <!-- Category Filter -->
-                        <select name="category_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded text-sm bg-white">
-                            <option value="">All Categories</option>
-                            @foreach($categories as $category)
-                            <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
-                                {{ $category->name }}
-                            </option>
-                            @endforeach
-                        </select>
-
-                        <!-- Warehouse Filter -->
-                        <select name="warehouse_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded text-sm bg-white">
-                            <option value="">All Warehouses</option>
-                            @foreach($warehouses as $warehouse)
-                            <option value="{{ $warehouse->id }}" {{ request('warehouse_id') == $warehouse->id ? 'selected' : '' }}>
-                                {{ $warehouse->name }}
-                            </option>
-                            @endforeach
-                        </select>
-
-                        <!-- Search Input -->
-                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by name or SKU..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white p-2 rounded w-full md:w-48 text-sm">
-
-                        <!-- Filter Button -->
-                        <button type="submit" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-semibold transition shadow-sm">Filter</button>
-
-                        <!-- Reset Button -->
-                        @if(request('search') || request('category_id') || request('warehouse_id'))
-                        <a href="{{ url('/') }}" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-3 py-2 rounded text-sm flex items-center hover:bg-gray-300 dark:hover:bg-gray-600 transition">Reset</a>
-                        @endif
-                    </form>
-
-                    <!-- Excel Export (Success / Emerald Tone) -->
-                    <form action="{{ route('assets.export') }}" method="GET" class="inline no-print">
-                        <input type="hidden" name="category_id" value="{{ request('category_id') }}">
-                        <input type="hidden" name="warehouse_id" value="{{ request('warehouse_id') }}">
-                        <input type="hidden" name="search" value="{{ request('search') }}">
-
-                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-1 transition shadow-sm">
-                            📊 Export Excel
-                        </button>
-                    </form>
-
-                    <!-- Print Button (Primary Blue Tone) -->
-                    <button onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold no-print flex items-center gap-1 transition shadow-sm">
-                        🖨️ Print / PDF
-                    </button>
-                </div>
-            </div>
-
-            <div class="overflow-x-auto table-wrapper">
-                <table id="print-table" class="w-full border-collapse border border-gray-200 dark:border-gray-700">
-                    <thead>
-                        <tr class="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 font-semibold">
-                            <th class="p-3 border border-gray-200 dark:border-gray-600">Asset Name</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-600">SKU</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-600">Category</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-600">Warehouse</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-600">Quantity</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-600">Model QR Code</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        @forelse($assets as $asset)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 font-semibold">
-                                <a href="{{ route('assets.show', $asset->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
-                                    {{ $asset->name }}
-                                </a>
-                            </td>
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 text-gray-600 dark:text-gray-400">{{ $asset->sku }}</td>
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 text-gray-700 dark:text-gray-300">{{ $asset->category->name ?? '-' }}</td>
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 text-gray-700 dark:text-gray-300">{{ $asset->warehouse->name ?? '-' }}</td>
-
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 text-center">
-                                <span class="{{ $asset->available_items_count <= $asset->min_stock_level ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 px-2 py-1 rounded font-bold inline-block' : 'text-gray-700 dark:text-gray-300' }}">
-                                    
-                                    <span class="font-semibold text-green-600 dark:text-green-400" title="Available Quantity">
-                                        {{ $asset->available_items_count ?? 0 }}
-                                    </span> 
-                                    <span class="text-gray-400 mx-1">/</span> 
-                                    <span title="Total Items">
-                                        {{ $asset->items_count ?? 0 }}
-                                    </span>
-
-                                    @if($asset->available_items_count <= $asset->min_stock_level)
-                                        <span class="block mt-1 text-xs">⚠️ Low Stock!</span>
-                                    @endif
-                                </span>
-                            </td>
-
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 text-center align-middle cursor-pointer group" 
-                            onclick="openQrModal(this)" 
-                            title="Click to view large QR code">
-
-                                <div class="inline-block w-16 h-16 [&>svg]:w-full [&>svg]:h-full pointer-events-none transition transform group-hover:scale-105 group-hover:opacity-90 rounded border border-transparent group-hover:border-indigo-400 p-0.5 shadow-sm bg-white">
-                                    {!! $asset->qr_code !!}
-                                </div>
-
-                                <div class="no-print text-[10px] text-indigo-600 dark:text-indigo-400 font-medium mt-1 opacity-80 group-hover:underline">
-                                    🔍Click to view
-                                </div>
-                            </td>
-
-                            @if(strtolower(trim(auth()->user()->role)) === 'admin')                                        
-                            <td class="border border-gray-200 dark:border-gray-700 p-3 text-center align-middle no-print">
-                                <div class="flex items-center justify-center gap-2">
-                                    <!-- Edit Button (Standard Amber / Yellow) -->
-                                    <a href="{{ route('assets.edit', $asset->id) }}" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-xs font-semibold transition shadow-sm">
-                                        ✏️ Edit
-                                    </a>
-
-                                    <!-- Delete Button (Standard Red) -->
-                                    <form action="{{ route('assets.destroy', $asset->id) }}" method="POST" class="inline-block m-0" onsubmit="return confirm('Are you sure you want to delete this asset?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition shadow-sm">
-                                            🗑️ Delete
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                            @endif
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="7" class="text-center p-4 text-gray-500 dark:text-gray-400">No assets found.</td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- 💡 Pagination Links ထည့်သွင်းခြင်း (ဇယားအောက်နားတွင်) -->
-            <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                {{ $assets->links() }}
-            </div>
-
-        </div>
-
+ <!-- Asset List Table & Filters -->
+<div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-6 print-shadow-none print-table-container">
+    
+    <!-- Header Section -->
+    <div class="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-4">
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Asset Inventory & QR Codes</h2>
     </div>
+
+    <!-- Search, Filter & Export Controls Bar -->
+    <form action="" method="GET" class="flex flex-wrap gap-2.5 items-center no-print bg-gray-50 dark:bg-gray-700/40 p-3.5 rounded-lg border border-gray-200 dark:border-gray-700">
+
+        <!-- Category Filter -->
+        <select name="category_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white px-3 py-2 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500">
+            <option value="">All Categories</option>
+            @foreach($categories as $category)
+            <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                {{ $category->name }}
+            </option>
+            @endforeach
+        </select>
+
+        <!-- Warehouse Filter -->
+        <select name="warehouse_id" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white px-3 py-2 rounded-lg text-xs bg-white focus:ring-2 focus:ring-indigo-500">
+            <option value="">All Warehouses</option>
+            @foreach($warehouses as $warehouse)
+            <option value="{{ $warehouse->id }}" {{ request('warehouse_id') == $warehouse->id ? 'selected' : '' }}>
+                {{ $warehouse->name }}
+            </option>
+            @endforeach
+        </select>
+
+        <!-- 📅 Start Date Input -->
+        <input type="date" name="start_date" value="{{ request('start_date') }}" title="Start Date" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white px-3 py-2 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500">
+
+        <!-- 📅 End Date Input -->
+        <input type="date" name="end_date" value="{{ request('end_date') }}" title="End Date" class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white px-3 py-2 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500">
+
+        <!-- Search Input -->
+        <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name or SKU..." class="border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white px-3 py-2 rounded-lg text-xs flex-1 min-w-[140px] focus:ring-2 focus:ring-indigo-500">
+
+        <!-- Filter Button -->
+        <button type="submit" class="bg-slate-700 hover:bg-slate-800 text-white px-3.5 py-2 rounded-lg text-xs font-semibold transition shadow-sm">
+            🔍 Filter
+        </button>
+
+        <!-- Reset Button -->
+        @if(request('search') || request('category_id') || request('warehouse_id') || request('start_date') || request('end_date'))
+        <a href="{{ url()->current() }}" class="bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-300 dark:hover:bg-gray-500 transition">
+            Reset
+        </a>
+        @endif
+
+        <!-- Divider -->
+        <div class="h-5 w-[1px] bg-gray-300 dark:bg-gray-600 mx-1 hidden xl:block"></div>
+
+        <!-- Excel Export Button -->
+        <a href="{{ route('assets.export', request()->all()) }}" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1 transition shadow-sm">
+            📊 Export Excel
+        </a>
+
+        <!-- Print Button -->
+        <button type="button" onclick="window.print()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold no-print flex items-center gap-1 transition shadow-sm">
+            🖨️ Print / PDF
+        </button>
+    </form>
+
+    <!-- Asset Table Section -->
+    <div class="overflow-x-auto table-wrapper">
+        <table id="print-table" class="w-full border-collapse border border-gray-200 dark:border-gray-700">
+            <thead>
+                <tr class="bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 font-semibold">
+                    <th class="p-3 border border-gray-200 dark:border-gray-600">Asset Name</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-600">SKU</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-600">Category</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-600">Warehouse</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-600">Quantity</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-600">Model QR Code</th>
+                    @if(strtolower(trim(auth()->user()->role)) === 'admin')
+                    <th class="p-3 border border-gray-200 dark:border-gray-600 no-print">Actions</th>
+                    @endif
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                @forelse($assets as $asset)
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 font-semibold">
+                        <a href="{{ route('assets.show', $asset->id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
+                            {{ $asset->name }}
+                        </a>
+                    </td>
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 text-gray-600 dark:text-gray-400">{{ $asset->sku }}</td>
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 text-gray-700 dark:text-gray-300">{{ $asset->category->name ?? '-' }}</td>
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 text-gray-700 dark:text-gray-300">{{ $asset->warehouse->name ?? '-' }}</td>
+
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 text-center">
+                        <span class="{{ $asset->available_items_count <= $asset->min_stock_level ? 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-300 px-2 py-1 rounded font-bold inline-block' : 'text-gray-700 dark:text-gray-300' }}">
+                            
+                            <span class="font-semibold text-green-600 dark:text-green-400" title="Available Quantity">
+                                {{ $asset->available_items_count ?? 0 }}
+                            </span> 
+                            <span class="text-gray-400 mx-1">/</span> 
+                            <span title="Total Items">
+                                {{ $asset->items_count ?? 0 }}
+                            </span>
+
+                            @if($asset->available_items_count <= $asset->min_stock_level)
+                                <span class="block mt-1 text-xs">⚠️ Low Stock!</span>
+                            @endif
+                        </span>
+                    </td>
+
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 text-center align-middle cursor-pointer group" 
+                    onclick="openQrModal(this)" 
+                    title="Click to view large QR code">
+                        <div class="inline-block w-16 h-16 [&>svg]:w-full [&>svg]:h-full pointer-events-none transition transform group-hover:scale-105 group-hover:opacity-90 rounded border border-transparent group-hover:border-indigo-400 p-0.5 shadow-sm bg-white">
+                            {!! $asset->qr_code !!}
+                        </div>
+                        <div class="no-print text-[10px] text-indigo-600 dark:text-indigo-400 font-medium mt-1 opacity-80 group-hover:underline">
+                            🔍Click to view
+                        </div>
+                    </td>
+
+                    @if(strtolower(trim(auth()->user()->role)) === 'admin')                                        
+                    <td class="border border-gray-200 dark:border-gray-700 p-3 text-center align-middle no-print">
+                        <div class="flex items-center justify-center gap-2">
+                            <!-- Edit Button -->
+                            <a href="{{ route('assets.edit', $asset->id) }}" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-xs font-semibold transition shadow-sm">
+                                ✏️ Edit
+                            </a>
+
+                            <!-- Delete Button -->
+                            <form action="{{ route('assets.destroy', $asset->id) }}" method="POST" class="inline-block m-0" onsubmit="return confirm('Are you sure you want to delete this asset?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition shadow-sm">
+                                    🗑️ Delete
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                    @endif
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="7" class="text-center p-4 text-gray-500 dark:text-gray-400">No assets found.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Links -->
+    <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+        {{ $assets->links() }}
+    </div>
+
+</div>
 
     <!-- 🔍 QR Code Modal Pop-up -->
     <div id="qrModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50 hidden no-print" onclick="closeQrModal()">

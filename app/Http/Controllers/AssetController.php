@@ -10,6 +10,7 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use App\Models\ActivityLog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\AssetItem;
+use Illuminate\Validation\Rule;
 
 class AssetController extends Controller
 {
@@ -63,6 +64,18 @@ class AssetController extends Controller
     // Filter by Warehouse
     if ($request->filled('warehouse_id')) {
         $query->where('warehouse_id', $request->warehouse_id);
+    }
+
+    // 📅 Date Range Filter (စတင်ရက်စွဲ နှင့် ပြီးဆုံးရက်စွဲ အလိုက် စစ်ထုတ်ခြင်း)
+    if ($request->filled('start_date') && $request->filled('end_date')) {
+        $query->whereBetween('created_at', [
+            $request->start_date . ' 00:00:00', 
+            $request->end_date . ' 23:59:59'
+        ]);
+    } elseif ($request->filled('start_date')) {
+        $query->where('created_at', '>=', $request->start_date . ' 00:00:00');
+    } elseif ($request->filled('end_date')) {
+        $query->where('created_at', '<=', $request->end_date . ' 23:59:59');
     }
 
     // 💡 Low Stock ဖြစ်နေသော ပစ္စည်းများကို ရှာဖွေခြင်း (Available items တွေက min_stock_level ထက် နည်း သို့မဟုတ် Equal ဖြစ်နေလျှင်)
@@ -211,38 +224,44 @@ public function show(Asset $asset)
     }
 
 
-    // Asset အချက်အလက်အသစ်များကို သိမ်းဆည်းရန် (Update)
-    public function update(Request $request, Asset $asset)
+  public function update(Request $request, $id)
     {
         if (!auth()->check() || !auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized action. Only Admin can update assets.');
         }
 
+        $asset = Asset::findOrFail($id);
+
         $validated = $request->validate([
-            'category_id' => 'required|exists:categories,id',
-            'warehouse_id' => 'required|exists:warehouses,id',
-            'name' => 'required|string|max:255',
-            'sku' => 'required|string|unique:assets,sku,' . $asset->id,
-            'quantity' => 'required|integer|min:0',
+            'category_id'     => 'required|exists:categories,id',
+            'warehouse_id'    => 'required|exists:warehouses,id',
+            'name'            => 'required|string|max:255',
+            'sku'             => [
+                'required',
+                'string',
+                // 💡 Warehouse တစ်ခုချင်းစီအောက်တွင်သာ SKU Unique ဖြစ်စေရန် နှင့် လက်ရှိ id ကို Ignore လုပ်ရန်
+                \Illuminate\Validation\Rule::unique('assets', 'sku')
+                    ->ignore($id)
+                    ->where(function ($query) use ($request) {
+                        return $query->where('warehouse_id', $request->warehouse_id);
+                    }),
+            ],
             'min_stock_level' => 'required|integer|min:0',
         ]);
 
-        // ပြောင်းလဲမှုမရှိခင် နာမည်ကို သိမ်းထားခြင်း
         $oldName = $asset->name;
         
         $asset->update($validated);
 
-        // **Asset ပြင်ဆင်ခြင်း Log မှတ်တမ်းတင်ရန် (နာမည်ပြောင်းလဲမှုကိုပါ ဖော်ပြမည်)**
         ActivityLog::create([
-            'user_id' => auth()->id(),
-            'action' => 'Updated',
-            'subject' => 'Asset',
+            'user_id'     => auth()->id(),
+            'action'      => 'Updated',
+            'subject'     => 'Asset',
             'description' => auth()->user()->name . ' updated asset from "' . $oldName . '" to "' . $asset->name . '" (SKU: ' . $asset->sku . ')'
         ]);
 
         return redirect()->to('/dashboard')->with('success', 'Asset updated successfully!');
     }
-
 
     // Asset ဖျက်ဆီးခြင်း (Destroy)
     public function destroy(Asset $asset)
@@ -272,7 +291,7 @@ public function export(Request $request)
 {
     $fileName = 'assets_export_' . date('Y-m-d') . '.csv';
 
-    // Query တည်ဆောက်ခြင်း (Index မှာသုံးတဲ့ Filter တိုင်းကို ထည့်ရန်)
+    // Query တည်ဆောက်ခြင်း (Index မှာသုံးတဲ့ Filter တိုင်းနဲ့ Date Range ကိုပါ ထည့်ရန်)
     $query = Asset::with(['category', 'warehouse']);
 
     // Search by Name or SKU
@@ -292,6 +311,18 @@ public function export(Request $request)
     // Filter by Warehouse
     if ($request->filled('warehouse_id')) {
         $query->where('warehouse_id', $request->warehouse_id);
+    }
+
+    // 📅 Date Range Filter ထည့်သွင်းခြင်း (created_at ကို အခြေခံ၍ စစ်ထုတ်မည်)
+    if ($request->filled('start_date') && $request->filled('end_date')) {
+        $query->whereBetween('created_at', [
+            $request->start_date . ' 00:00:00', 
+            $request->end_date . ' 23:59:59'
+        ]);
+    } elseif ($request->filled('start_date')) {
+        $query->where('created_at', '>=', $request->start_date . ' 00:00:00');
+    } elseif ($request->filled('end_date')) {
+        $query->where('created_at', '<=', $request->end_date . ' 23:59:59');
     }
 
     $assets = $query->latest()->get();
@@ -316,7 +347,7 @@ public function export(Request $request)
         // နံပါတ်စဉ် (1, 2, 3...) ထည့်ရန် $index ကို သုံးခြင်း
         foreach ($assets as $index => $asset) {
             fputcsv($file, [
-                $index + 1, // ၁, ၂, ၃ စသည်ဖြင့် အစဉ်လိုက်ပေါ်စေရန် ($index စတင်သည်မှာ 0 ဖြစ်၍ +1 လုပ်ပေးသည်)
+                $index + 1,
                 $asset->name,
                 $asset->sku,
                 $asset->category->name ?? 'N/A',
