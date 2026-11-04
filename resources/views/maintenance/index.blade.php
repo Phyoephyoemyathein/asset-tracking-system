@@ -16,6 +16,8 @@
                 </a>
             </div>
 
+
+            @if(auth()->user()->role === 'admin')
             <!-- Add Maintenance Form Card -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg p-6 border border-gray-200 dark:border-gray-700">
                 <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
@@ -63,6 +65,7 @@
                     </div>
                 </form>
             </div>
+            @endif
 
             <!-- Maintenance History List Card -->
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg p-6 border border-gray-200 dark:border-gray-700">
@@ -77,7 +80,9 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Cost</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                                @if(auth()->user()->role === 'admin')
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
@@ -86,23 +91,37 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 font-medium">{{ $maintenance->issue_description }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{{ $maintenance->action_taken ?? '-' }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">${{ number_format($maintenance->cost, 2) }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                        <form action="{{ route('assets.maintenances.update', $maintenance->id) }}" method="POST" class="flex items-center gap-2">
-                                            @csrf
-                                            @method('PUT')
-                                            <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 p-1.5
-                                                @if($maintenance->status == 'completed') text-green-700 bg-green-50 dark:bg-green-900/20 
-                                                @elseif($maintenance->status == 'in_progress') text-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 
-                                                @elseif($maintenance->status == 'failed') text-red-700 bg-red-50 dark:bg-red-900/20 
-                                                @else text-gray-700 bg-gray-50 dark:bg-gray-900/20 @endif">
-                                                <option value="pending" {{ $maintenance->status == 'pending' ? 'selected' : '' }}>Pending</option>
-                                                <option value="in_progress" {{ $maintenance->status == 'in_progress' ? 'selected' : '' }}>In Progress</option>
-                                                <option value="completed" {{ $maintenance->status == 'completed' ? 'selected' : '' }}>Completed</option>
-                                                <option value="failed" {{ $maintenance->status == 'failed' ? 'selected' : '' }}>Failed</option>
-                                            </select>
-                                        </form>
-                                    </td>
+                                   <td class="px-6 py-4 whitespace-nowrap text-sm">
+    @if(auth()->user()->role === 'admin')
+        {{-- Admin ဖြစ်မှသာ Dropdown ဖြင့် Status ကို တိုက်ရိုက် Update လုပ်နိုင်မည် --}}
+        <form action="{{ route('assets.maintenances.update', $maintenance->id) }}" method="POST" class="flex items-center gap-2">
+            @csrf
+            @method('PUT')
+            <select name="status" onchange="this.form.submit()" class="text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 p-1.5
+                @if($maintenance->status == 'completed') text-green-700 bg-green-50 dark:bg-green-900/20 
+                @elseif($maintenance->status == 'in_progress') text-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 
+                @elseif($maintenance->status == 'failed') text-red-700 bg-red-50 dark:bg-red-900/20 
+                @else text-gray-700 bg-gray-50 dark:bg-gray-900/20 @endif">
+                <option value="pending" {{ $maintenance->status == 'pending' ? 'selected' : '' }}>Pending</option>
+                <option value="in_progress" {{ $maintenance->status == 'in_progress' ? 'selected' : '' }}>In Progress</option>
+                <option value="completed" {{ $maintenance->status == 'completed' ? 'selected' : '' }}>Completed</option>
+                <option value="failed" {{ $maintenance->status == 'failed' ? 'selected' : '' }}>Failed</option>
+            </select>
+        </form>
+    @else
+        {{-- Staff ဖြစ်ပါက Status ကို ကြည့်ရှုရုံသာ ကြည့်နိုင်မည် (Status Badge ဖြင့် ပြရန်) --}}
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+            @if($maintenance->status == 'completed') text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400
+            @elseif($maintenance->status == 'in_progress') text-yellow-700 bg-yellow-100 dark:bg-yellow-900/30 dark:text-yellow-400
+            @elseif($maintenance->status == 'failed') text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400
+            @else text-gray-700 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 @endif">
+            {{ ucfirst(str_replace('_', ' ', $maintenance->status)) }}
+        </span>
+    @endif
+</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{{ $maintenance->reported_date }}</td>
+
+                                    @if(auth()->user()->role === 'admin')
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <form action="{{ route('assets.maintenances.destroy', $maintenance->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this record?');">
                                             @csrf
@@ -112,6 +131,7 @@
                                             </button>
                                         </form>
                                     </td>
+                                    @endif
                                 </tr>
                             @empty
                                 <tr>

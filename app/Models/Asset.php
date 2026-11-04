@@ -18,7 +18,8 @@ class Asset extends Model
         'qr_code',
         'quantity',
         'min_stock_level',
-        'status'
+        'status',
+        'assigned_to'
     ];
 
     public function category()
@@ -54,6 +55,11 @@ public function maintenances()
 public function items()
 {
     return $this->hasMany(AssetItem::class);
+}
+
+public function assignee()
+{
+    return $this->belongsTo(\App\Models\User::class, 'assigned_to');
 }
 
 }

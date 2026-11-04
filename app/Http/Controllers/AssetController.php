@@ -11,150 +11,162 @@ use App\Models\ActivityLog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\AssetItem;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\LowStockNotification;
+use Illuminate\Support\Facades\DB;
 
 class AssetController extends Controller
 {
     public function index(Request $request)
-{
-    // Dashboard Statistics တွက်ချက်ခြင်း
-    $totalAssets = Asset::count();
-    // စုစုပေါင်း လက်ကျန်ရှိနေသော (Available) ပစ္စည်းအရေအတွက်ကို တွက်ချက်ခြင်း
-    $totalQuantity = \App\Models\AssetItem::where('status', 'available')->count();
-    $totalCategories = Category::count();
-    $totalWarehouses = Warehouse::count();
+    {
+        // Dashboard Statistics တွက်ချက်ခြင်း
+        $totalAssets = Asset::count();
+        // စုစုပေါင်း လက်ကျန်ရှိနေသော (Available) ပစ္စည်းအရေအတွက်ကို တွက်ချက်ခြင်း
+        $totalQuantity = \App\Models\AssetItem::where('status', 'available')->count();
+        $totalCategories = Category::count();
+        $totalWarehouses = Warehouse::count();
 
-    // 📊 Chart တွေအတွက် Data တွက်ချက်ခြင်း (Available items များကို အခြေခံ၍ တွက်ချက်ခြင်း)
-    $categoryData = Category::with('assets')->get();
-    $categoryLabels = $categoryData->pluck('name');
-    $categoryQuantities = $categoryData->map(function($category) {
-        return $category->assets->sum(function($asset) {
-            return $asset->items()->where('status', 'available')->count();
+        // 📊 Chart တွေအတွက် Data တွက်ချက်ခြင်း (Available items များကို အခြေခံ၍ တွက်ချက်ခြင်း)
+        $categoryData = Category::with('assets')->get();
+        $categoryLabels = $categoryData->pluck('name');
+        $categoryQuantities = $categoryData->map(function($category) {
+            return $category->assets->sum(function($asset) {
+                return $asset->items()->where('status', 'available')->count();
+            });
         });
-    });
 
-    $warehouseData = Warehouse::with('assets')->get();
-    $warehouseLabels = $warehouseData->pluck('name');
-    $warehouseQuantities = $warehouseData->map(function($warehouse) {
-        return $warehouse->assets->sum(function($asset) {
-            return $asset->items()->where('status', 'available')->count();
+        $warehouseData = Warehouse::with('assets')->get();
+        $warehouseLabels = $warehouseData->pluck('name');
+        $warehouseQuantities = $warehouseData->map(function($warehouse) {
+            return $warehouse->assets->sum(function($asset) {
+                return $asset->items()->where('status', 'available')->count();
+            });
         });
-    });
 
-    // Main Asset Query (Available နှင့် Total count များကိုပါ တစ်ပါတည်း ယူဆောင်ခြင်း)
-    $query = Asset::with(['category', 'warehouse'])
-        ->withCount('items')
-        ->withCount(['items as available_items_count' => function ($q) {
-            $q->where('status', 'available');
-        }]);
+        // Main Asset Query (Available နှင့် Total count များကိုပါ တစ်ပါတည်း ယူဆောင်ခြင်း)
+        $query = Asset::with(['category', 'warehouse'])
+            ->withCount('items')
+            ->withCount(['items as available_items_count' => function ($q) {
+                $q->where('status', 'available');
+            }]);
 
-    // Search by Name or SKU
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('sku', 'like', "%{$search}%");
+        // Search by Name or SKU
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by Category
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        // Filter by Warehouse
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->warehouse_id);
+        }
+
+        // 📅 Date Range Filter (စတင်ရက်စွဲ နှင့် ပြီးဆုံးရက်စွဲ အလိုက် စစ်ထုတ်ခြင်း)
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('created_at', [
+                $request->start_date . ' 00:00:00', 
+                $request->end_date . ' 23:59:59'
+            ]);
+        } elseif ($request->filled('start_date')) {
+            $query->where('created_at', '>=', $request->start_date . ' 00:00:00');
+        } elseif ($request->filled('end_date')) {
+            $query->where('created_at', '<=', $request->end_date . ' 23:59:59');
+        }
+
+        // 💡 Low Stock ဖြစ်နေသော ပစ္စည်းများကို ရှာဖွေခြင်း (Available items တွေက min_stock_level ထက် နည်း သို့မဟုတ် Equal ဖြစ်နေလျှင်)
+        $lowStockAssets = Asset::with('items')->get()->filter(function($asset) {
+            $availableCount = $asset->items()->where('status', 'available')->count();
+            return $availableCount <= $asset->min_stock_level;
         });
+
+        $assets = $query->latest()->paginate(5)->withQueryString();
+        $categories = Category::all();
+        $warehouses = Warehouse::all();
+
+        return view('assets', compact(
+            'assets', 
+            'categories', 
+            'warehouses', 
+            'totalAssets', 
+            'totalQuantity', 
+            'totalCategories', 
+            'totalWarehouses',
+            'categoryLabels',     
+            'categoryQuantities',  
+            'warehouseLabels',     
+            'warehouseQuantities', 
+            'lowStockAssets'
+        ));
     }
 
-    // Filter by Category
-    if ($request->filled('category_id')) {
-        $query->where('category_id', $request->category_id);
-    }
 
-    // Filter by Warehouse
-    if ($request->filled('warehouse_id')) {
-        $query->where('warehouse_id', $request->warehouse_id);
-    }
 
-    // 📅 Date Range Filter (စတင်ရက်စွဲ နှင့် ပြီးဆုံးရက်စွဲ အလိုက် စစ်ထုတ်ခြင်း)
-    if ($request->filled('start_date') && $request->filled('end_date')) {
-        $query->whereBetween('created_at', [
-            $request->start_date . ' 00:00:00', 
-            $request->end_date . ' 23:59:59'
+    // Asset အသစ် သိမ်းဆည်းရန်
+    public function store(Request $request)
+    {
+        if (!auth()->check() || !auth()->user()->isAdmin()) {
+            abort(403, 'Unauthorized action. Only Admin can register new assets.');
+        }
+
+        $validated = $request->validate([
+            'category_id'     => 'required|exists:categories,id',
+            'warehouse_id'    => 'required|exists:warehouses,id',
+            'name'            => 'required|string|max:255',
+            'sku'             => 'required|string|unique:assets,sku',
+            'quantity'        => 'required|integer|min:1',
+            'min_stock_level' => 'required|integer|min:0',
         ]);
-    } elseif ($request->filled('start_date')) {
-        $query->where('created_at', '>=', $request->start_date . ' 00:00:00');
-    } elseif ($request->filled('end_date')) {
-        $query->where('created_at', '<=', $request->end_date . ' 23:59:59');
-    }
 
-    // 💡 Low Stock ဖြစ်နေသော ပစ္စည်းများကို ရှာဖွေခြင်း (Available items တွေက min_stock_level ထက် နည်း သို့မဟုတ် Equal ဖြစ်နေလျှင်)
-    $lowStockAssets = Asset::with('items')->get()->filter(function($asset) {
+        // ၁။ Main Asset (Master Record) ကို အရင်ဆောက်မည်
+        $asset = Asset::create($validated);
+
+        // ၂။ Main Asset အတွက် Master QR Code ဖန်တီးခြင်း
+        $qrCode = QrCode::size(150)->generate($asset->sku);
+        $asset->update([
+            'qr_code' => $qrCode
+        ]);
+
+        // ၃။ Quantity အရေအတွက်အတိုင်း asset_items ထဲသို့ Serial / QR Code သီးသန့်စီ Auto ဖန်တီးမည်
+        for ($i = 1; $i <= $request->quantity; $i++) {
+            $uniqueSuffix = str_pad($i, 3, '0', STR_PAD_LEFT); 
+            $serialNumber = $asset->sku . '-' . $uniqueSuffix; 
+            
+            $itemQrCode = QrCode::size(150)->generate($serialNumber);
+
+            AssetItem::create([
+                'asset_id'      => $asset->id,
+                'serial_number' => $serialNumber,
+                'qr_code'       => $itemQrCode,
+                'status'        => 'available',
+            ]);
+        }
+
+        // 💡 ၄။ ထည့်သွင်းလိုက်သော ပစ္စည်းသည် Low Stock အဆင့်ရောက်နေပါက Login ဝင်ထားသော Admin ၏ Email ဆီသို့ ပို့မည်
         $availableCount = $asset->items()->where('status', 'available')->count();
-        return $availableCount <= $asset->min_stock_level;
-    });
+        if ($availableCount <= $asset->min_stock_level) {
+            Mail::to(auth()->user()->email)->send(new LowStockNotification($asset));
+        }
 
-    $assets = $query->latest()->paginate(5)->withQueryString();
-    $categories = Category::all();
-    $warehouses = Warehouse::all();
-
-    return view('assets', compact(
-        'assets', 
-        'categories', 
-        'warehouses', 
-        'totalAssets', 
-        'totalQuantity', 
-        'totalCategories', 
-        'totalWarehouses',
-        'categoryLabels',     
-        'categoryQuantities',  
-        'warehouseLabels',     
-        'warehouseQuantities', 
-        'lowStockAssets'
-    ));
-}
-
-   // Asset အသစ် သိမ်းဆည်းရန်
-public function store(Request $request)
-{
-    if (!auth()->check() || !auth()->user()->isAdmin()) {
-        abort(403, 'Unauthorized action. Only Admin can register new assets.');
-    }
-
-    $validated = $request->validate([
-        'category_id'     => 'required|exists:categories,id',
-        'warehouse_id'    => 'required|exists:warehouses,id',
-        'name'            => 'required|string|max:255',
-        'sku'             => 'required|string|unique:assets,sku',
-        'quantity'        => 'required|integer|min:1',
-        'min_stock_level' => 'required|integer|min:0',
-    ]);
-
-    // ၁။ Main Asset (Master Record) ကို အရင်ဆောက်မည်
-    $asset = Asset::create($validated);
-
-    // ၂။ Main Asset အတွက် Master QR Code ဖန်တီးခြင်း
-    $qrCode = QrCode::size(150)->generate($asset->sku);
-    $asset->update([
-        'qr_code' => $qrCode
-    ]);
-
-    // ၃။ Quantity အရေအတွက်အတိုင်း asset_items ထဲသို့ Serial / QR Code သီးသန့်စီ Auto ဖန်တီးမည်
-    for ($i = 1; $i <= $request->quantity; $i++) {
-        $uniqueSuffix = str_pad($i, 3, '0', STR_PAD_LEFT); // 001, 002, 003...
-        $serialNumber = $asset->sku . '-' . $uniqueSuffix; // ဥပမာ- SP-001-2026-001
-        
-        // Item တစ်ခုချင်းစီ၏ QR Code (Text / SVG)
-        $itemQrCode = QrCode::size(150)->generate($serialNumber);
-
-        AssetItem::create([
-            'asset_id'      => $asset->id,
-            'serial_number' => $serialNumber,
-            'qr_code'       => $itemQrCode,
-            'status'        => 'available',
+        // ၅။ Activity Log မှတ်တမ်းတင်ခြင်း
+        ActivityLog::create([
+            'user_id'     => auth()->id(),
+            'action'      => 'Created',
+            'subject'     => 'Asset',
+            'description' => auth()->user()->name . ' registered a new asset: ' . $asset->name . ' (SKU: ' . $asset->sku . ') with ' . $request->quantity . ' individual item(s).'
         ]);
+
+        return back()->with('success', 'Asset and individual item serials/QR codes generated successfully!');
     }
 
-    // ၄။ Activity Log မှတ်တမ်းတင်ခြင်း
-    ActivityLog::create([
-        'user_id'     => auth()->id(),
-        'action'      => 'Created',
-        'subject'     => 'Asset',
-        'description' => auth()->user()->name . ' registered a new asset: ' . $asset->name . ' (SKU: ' . $asset->sku . ') with ' . $request->quantity . ' individual item(s).'
-    ]);
 
-    return back()->with('success', 'Asset and individual item serials/QR codes generated successfully!');
-}
 
     // Category အသစ် သိမ်းဆည်းရန်
     public function storeCategory(Request $request)
@@ -170,6 +182,8 @@ public function store(Request $request)
         return back()->with('success', 'Category added successfully!');
     }
 
+
+
     // Warehouse အသစ် သိမ်းဆည်းရန်
     public function storeWarehouse(Request $request)
     {
@@ -184,19 +198,20 @@ public function store(Request $request)
         return back()->with('success', 'Warehouse added successfully!');
     }
 
-public function show(Asset $asset)
+
+
+ public function show(Asset $asset)
 {
-    // Category, Warehouse နဲ့ တစ်လုံးချင်းစီခွဲထားသော items များကိုပါ တစ်ခါတည်း ယူရန်
-    $asset->load(['category', 'warehouse', 'items.maintenances']);
+    $asset->load(['category', 'warehouse', 'assignee']);
     
-    // Status 'Available' ဖြစ်သော item အရေအတွက်ကို တွက်ချက်ခြင်း (သို့မဟုတ် quantity)
-    // အကယ်၍ item တစ်လုံးချင်းစီ (Serial level) ဖြင့် Tracking လုပ်ထားလျှင်:
     $asset->available_total_quantity = $asset->items()->where('status', 'Available')->count();
     
-    // Warehouse စာရင်းများကို ယူဆောင်လာခြင်း
+    // 💡 အဓိကပြင်ဆင်ရန် - latest() အစား orderBy('serial_number', 'asc') ဖြင့် အစဉ်လိုက် စီပေးပါ
+    $items = $asset->items()->with(['maintenances', 'assignee'])->orderBy('serial_number', 'asc')->paginate(5);
+    
     $warehouses = Warehouse::all();
+    $users = \App\Models\User::all();
 
-    // Transaction တွေကို User ရဲ့ Role ပေါ်မူတည်၍ Filter လုပ်ခြင်း
     $transactionsQuery = $asset->transactions()->with('user');
 
     if (auth()->user()->role !== 'admin') {  
@@ -205,11 +220,12 @@ public function show(Asset $asset)
 
     $transactions = $transactionsQuery->latest()->get();
 
-    return view('show', compact('asset', 'warehouses', 'transactions'));
+    return view('show', compact('asset', 'items', 'warehouses', 'transactions', 'users'));
 }
 
 
-// Asset အချက်အလက် ပြင်ဆင်ရန် Form သို့ ယူသွားခြင်း
+
+    // Asset အချက်အလက် ပြင်ဆင်ရန် Form သို့ ယူသွားခြင်း
     public function edit(Asset $asset)
     {
         if (!auth()->check() || !auth()->user()->isAdmin()) {
@@ -224,7 +240,8 @@ public function show(Asset $asset)
     }
 
 
-  public function update(Request $request, $id)
+
+    public function update(Request $request, $id)
     {
         if (!auth()->check() || !auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized action. Only Admin can update assets.');
@@ -239,7 +256,6 @@ public function show(Asset $asset)
             'sku'             => [
                 'required',
                 'string',
-                // 💡 Warehouse တစ်ခုချင်းစီအောက်တွင်သာ SKU Unique ဖြစ်စေရန် နှင့် လက်ရှိ id ကို Ignore လုပ်ရန်
                 \Illuminate\Validation\Rule::unique('assets', 'sku')
                     ->ignore($id)
                     ->where(function ($query) use ($request) {
@@ -253,6 +269,12 @@ public function show(Asset $asset)
         
         $asset->update($validated);
 
+        // 💡 Update လုပ်ပြီးချိန်တွင် Low Stock ဖြစ်ပါက Login ဝင်ထားသော Admin ၏ Email ဆီသို့ ပို့မည်
+        $availableCount = $asset->items()->where('status', 'available')->count();
+        if ($availableCount <= $asset->min_stock_level) {
+            Mail::to(auth()->user()->email)->send(new LowStockNotification($asset));
+        }
+
         ActivityLog::create([
             'user_id'     => auth()->id(),
             'action'      => 'Updated',
@@ -262,6 +284,8 @@ public function show(Asset $asset)
 
         return redirect()->to('/dashboard')->with('success', 'Asset updated successfully!');
     }
+
+
 
     // Asset ဖျက်ဆီးခြင်း (Destroy)
     public function destroy(Asset $asset)
@@ -275,7 +299,6 @@ public function show(Asset $asset)
         
         $asset->delete();
 
-        // **Asset ဖျက်ဆီးခြင်း Log မှတ်တမ်းတင်ရန်**
         ActivityLog::create([
             'user_id' => auth()->id(),
             'action' => 'Deleted',
@@ -287,75 +310,156 @@ public function show(Asset $asset)
     }
 
 
-public function export(Request $request)
+
+    public function export(Request $request)
+    {
+        $fileName = 'assets_export_' . date('Y-m-d') . '.csv';
+
+        $query = Asset::with(['category', 'warehouse']);
+
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('sku', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        if ($request->filled('warehouse_id')) {
+            $query->where('warehouse_id', $request->warehouse_id);
+        }
+
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('created_at', [
+                $request->start_date . ' 00:00:00', 
+                $request->end_date . ' 23:59:59'
+            ]);
+        } elseif ($request->filled('start_date')) {
+            $query->where('created_at', '>=', $request->start_date . ' 00:00:00');
+        } elseif ($request->filled('end_date')) {
+            $query->where('created_at', '<=', $request->end_date . ' 23:59:59');
+        }
+
+        $assets = $query->latest()->get();
+
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $callback = function() use($assets) {
+            $file = fopen('php://output', 'w');
+            
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            fputcsv($file, ['No', 'Asset Name', 'SKU', 'Category', 'Warehouse', 'Quantity', 'Registered Date']);
+
+            foreach ($assets as $index => $asset) {
+                fputcsv($file, [
+                    $index + 1,
+                    $asset->name,
+                    $asset->sku,
+                    $asset->category->name ?? 'N/A',
+                    $asset->warehouse->name ?? 'N/A',
+                    $asset->quantity,
+                    $asset->created_at
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+
+   public function import(Request $request)
 {
-    $fileName = 'assets_export_' . date('Y-m-d') . '.csv';
+    $request->validate([
+        'file' => 'required|mimes:csv,txt,xlsx|max:2048',
+    ]);
 
-    // Query တည်ဆောက်ခြင်း (Index မှာသုံးတဲ့ Filter တိုင်းနဲ့ Date Range ကိုပါ ထည့်ရန်)
-    $query = Asset::with(['category', 'warehouse']);
+    $file = $request->file('file');
+    $path = $file->getRealPath();
+    
+    $data = array_map('str_getcsv', file($path));
+    $header = array_shift($data); // ပထမဆုံး row (header) ကို ဖယ်ထုတ်သည်
 
-    // Search by Name or SKU
-    if ($request->filled('search')) {
-        $search = $request->search;
-        $query->where(function($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('sku', 'like', "%{$search}%");
-        });
+    DB::beginTransaction();
+    try {
+        foreach ($data as $row) {
+            if (count($row) < 6) continue;
+
+            $name = trim($row[0]);
+            $sku = trim($row[1]);
+            $categoryId = trim($row[2]);
+            $warehouseId = trim($row[3]);
+            $quantity = (int)$row[4];
+            $minStockLevel = (int)$row[5];
+
+            // 💡 Asset တစ်ခုလုံးအတွက် QR Code ဂျင်နရေတာ လုပ်ခြင်း
+            $assetQrSvg = QrCode::size(200)->generate($sku);
+
+            // Asset ကို ဖန်တီးခြင်း သို့မဟုတ် ရှာဖွေခြင်း (qr_code ကိုပါ ထည့်သွင်းရန်)
+            $asset = Asset::firstOrCreate(
+                ['sku' => $sku],
+                [
+                    'name' => $name,
+                    'category_id' => $categoryId,
+                    'warehouse_id' => $warehouseId,
+                    'min_stock_level' => $minStockLevel,
+                    'qr_code' => $assetQrSvg, // 👈 ဤနေရာတွင် Asset QR Code ထည့်ရန်
+                ]
+            );
+
+            // Quantity အတိုင်း AssetItem တစ်ခုချင်းစီအတွက် Serial နှင့် QR Code ထည့်သွင်းခြင်း
+            for ($i = 1; $i <= $quantity; $i++) {
+                $serialNumber = $sku . '-' . str_pad($i, 3, '0', STR_PAD_LEFT);
+                $itemQrSvg = QrCode::size(100)->generate($serialNumber);
+
+                AssetItem::firstOrCreate(
+                    ['serial_number' => $serialNumber],
+                    [
+                        'asset_id' => $asset->id,
+                        'status' => 'available',
+                        'qr_code' => $itemQrSvg,
+                    ]
+                );
+            }
+        }
+
+        DB::commit();
+        return redirect()->back()->with('success', 'Assets and items imported successfully with QR codes!');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return redirect()->back()->withErrors(['error' => 'Import failed: ' . $e->getMessage()]);
     }
+}
 
-    // Filter by Category
-    if ($request->filled('category_id')) {
-        $query->where('category_id', $request->category_id);
-    }
 
-    // Filter by Warehouse
-    if ($request->filled('warehouse_id')) {
-        $query->where('warehouse_id', $request->warehouse_id);
-    }
-
-    // 📅 Date Range Filter ထည့်သွင်းခြင်း (created_at ကို အခြေခံ၍ စစ်ထုတ်မည်)
-    if ($request->filled('start_date') && $request->filled('end_date')) {
-        $query->whereBetween('created_at', [
-            $request->start_date . ' 00:00:00', 
-            $request->end_date . ' 23:59:59'
-        ]);
-    } elseif ($request->filled('start_date')) {
-        $query->where('created_at', '>=', $request->start_date . ' 00:00:00');
-    } elseif ($request->filled('end_date')) {
-        $query->where('created_at', '<=', $request->end_date . ' 23:59:59');
-    }
-
-    $assets = $query->latest()->get();
-
+public function downloadSampleCsv()
+{
     $headers = [
-        "Content-type"        => "text/csv; charset=UTF-8",
-        "Content-Disposition" => "attachment; filename=$fileName",
-        "Pragma"              => "no-cache",
-        "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-        "Expires"             => "0"
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename="sample_assets_import.csv"',
     ];
 
-    $callback = function() use($assets) {
+    $columns = ['Name', 'SKU', 'Category ID', 'Warehouse ID', 'Quantity', 'Min Stock Level'];
+
+    $callback = function() use ($columns) {
         $file = fopen('php://output', 'w');
+        fputcsv($file, $columns);
+
+        // Sample Data rows
+        fputcsv($file, ['Dell XPS 15 Laptop', 'LAP-DELL-001', '1', '1', '5', '2']);
+        fputcsv($file, ['Logitech MX Master 3', 'MSE-LOG-002', '2', '1', '10', '3']);
         
-        // UTF-8 BOM ထည့်သွင်းခြင်း
-        fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-
-        // CSV Header (ID အစား 'No' ဟု ပြောင်းထားသည်)
-        fputcsv($file, ['No', 'Asset Name', 'SKU', 'Category', 'Warehouse', 'Quantity', 'Registered Date']);
-
-        // နံပါတ်စဉ် (1, 2, 3...) ထည့်ရန် $index ကို သုံးခြင်း
-        foreach ($assets as $index => $asset) {
-            fputcsv($file, [
-                $index + 1,
-                $asset->name,
-                $asset->sku,
-                $asset->category->name ?? 'N/A',
-                $asset->warehouse->name ?? 'N/A',
-                $asset->quantity,
-                $asset->created_at
-            ]);
-        }
         fclose($file);
     };
 
@@ -364,56 +468,54 @@ public function export(Request $request)
 
 
 
+    // SKU ဖြင့် Scan ဖတ်လိုက်သည့်အခါ
+    public function scan(Request $request)
+    {
+        $request->validate([
+            'sku' => 'required|string',
+        ]);
 
+        $assets = Asset::where('sku', $request->sku)->get();
 
-// SKU ဖြင့် Scan ဖတ်လိုက်သည့်အခါ
-public function scan(Request $request)
-{
-    $request->validate([
-        'sku' => 'required|string',
-    ]);
+        if ($assets->isEmpty()) {
+            return back()->with('error', 'Asset not found with SKU: ' . $request->sku);
+        }
 
-    $assets = Asset::where('sku', $request->sku)->get();
-
-    if ($assets->isEmpty()) {
-        return back()->with('error', 'Asset not found with SKU: ' . $request->sku);
+        return redirect()->route('assets.by-sku', $request->sku);
     }
 
-    // SKU တူတာနဲ့ သက်ဆိုင်တဲ့ Warehouse အားလုံးကို ပြမယ့် Page ဆီ တိုက်ရိုက် ပို့မည်
-    return redirect()->route('assets.by-sku', $request->sku);
-}
 
-public function bySku($sku)
-{
-    // SKU တူပြီး Warehouse အလိုက် ခွဲခြားကာ Available items အရေအတွက်ကို တိကျစွာ ရေတွက်ခြင်း
-    $assets = Asset::where('sku', $sku)
-                ->with(['warehouse', 'category', 'items'])
-                ->get()
-                ->groupBy('warehouse_id')
-                ->map(function ($group) {
-                    $firstItem = $group->first();
-                    
-                    // Warehouse တစ်ခုချင်းစီအောက်တွင် Available ဖြစ်သော items အရေအတွက် (သို့မဟုတ် quantity) ကို စုစုပေါင်းပေါင်းခြင်း
-                    $firstItem->total_quantity = $group->sum(function ($asset) {
-                        return $asset->items()->where('status', 'Available')->count(); 
-                        // (တကယ်လို့ items table မသုံးဘဲ quantity ကော်လံကိုပဲ သုံးတာဆိုရင် $asset->quantity လို့ သုံးနိုင်ပါတယ်)
+
+    public function bySku($sku)
+    {
+        $assets = Asset::where('sku', $sku)
+                    ->with(['warehouse', 'category', 'items'])
+                    ->get()
+                    ->groupBy('warehouse_id')
+                    ->map(function ($group) {
+                        $firstItem = $group->first();
+                        
+                        $firstItem->total_quantity = $group->sum(function ($asset) {
+                            return $asset->items()->where('status', 'Available')->count(); 
+                        });
+                        
+                        return $firstItem;
                     });
-                    
-                    return $firstItem;
-                });
 
-    if ($assets->isEmpty()) {
-        return redirect()->route('dashboard')->with('error', 'Asset not found with SKU: ' . $sku);
+        if ($assets->isEmpty()) {
+            return redirect()->route('dashboard')->with('error', 'Asset not found with SKU: ' . $sku);
+        }
+
+        if ($assets->count() === 1) {
+            return redirect()->route('assets.show', $assets->first()->id);
+        }
+
+        return view('sku-show', compact('assets', 'sku'));
     }
 
-    if ($assets->count() === 1) {
-        return redirect()->route('assets.show', $assets->first()->id);
-    }
 
-    return view('sku-show', compact('assets', 'sku'));
-}
 
-public function activityLogs()
+    public function activityLogs()
     {
         if (!auth()->user()->isAdmin()) {
             abort(403, 'Unauthorized action.');
@@ -423,5 +525,38 @@ public function activityLogs()
         
         return view('activity-logs', compact('logs'));
     }
+
+
+
+    public function assign(Request $request, Asset $asset)
+{
+    $request->validate([
+        'assigned_to' => 'nullable|exists:users,id',
+    ]);
+
+    $asset->update([
+        'assigned_to' => $request->assigned_to,
+    ]);
+
+    return back()->with('success', 'Asset assigned successfully!');
+}
+
+
+public function assignItem(Request $request, $id)
+{
+   if (auth()->user()->role !== 'admin') {
+        abort(403, 'Unauthorized action. Admin access only.');
+    }
+
+    $item = \App\Models\AssetItem::findOrFail($id);
+    
+    $item->update([
+        'assigned_to' => $request->input('assigned_to')
+    ]);
+
+    return back()->with('success', 'Serial item assigned successfully!');
+}
+
+
 
 }

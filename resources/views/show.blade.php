@@ -177,8 +177,7 @@
                 </button>
             </div>
         </div>
-
-        <!-- Main Asset Information & Summary Cards -->
+<!-- Main Asset Information & Summary Cards -->
         <div id="asset-summary-header" class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg p-6 mb-6">
             <div class="flex justify-between items-start border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
                 <div>
@@ -193,7 +192,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div>
                     <span class="block text-xs font-medium text-gray-400">Category</span>
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $asset->category->name ?? 'N/A' }}</span>
@@ -201,6 +200,17 @@
                 <div>
                     <span class="block text-xs font-medium text-gray-400">Warehouse Location</span>
                     <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $asset->warehouse->name ?? 'N/A' }}</span>
+                </div>
+                <div>
+                    <span class="block text-xs font-medium text-gray-400">Assigned Employee</span>
+                    @if($asset->assignee)
+        {{ $asset->assignee->name }}
+    @elseif($asset->items->whereNotNull('assigned_to')->count() > 0)
+        <!-- Serial တွေထဲမှာ Assign လုပ်ထားတာ ရှိရင် အဲ့ဒီနာမည်တွေကို စုပြရန် -->
+        {{ $asset->items->filter(fn($item) => $item->assignee)->map(fn($item) => $item->assignee->name)->unique()->join(', ') }}
+    @else
+        <span class="text-indigo-400">Unassigned</span>
+    @endif
                 </div>
                 <div>
                     <span class="block text-xs font-medium text-gray-400">Registered Date</span>
@@ -213,72 +223,101 @@
             </div>
         </div>
 
-        <!-- 💡 Individual Items & QR Codes (Table View for Report) -->
-        <div id="main-report-section" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4 border border-gray-100 dark:border-gray-700 transition-colors duration-200">
-            <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">Individual Items & QR Codes (Serial Level)</h2>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse border border-gray-200 dark:border-gray-700 text-sm">
-                    <thead>
-                        <tr class="bg-gray-100 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
-                            <th class="p-3 border border-gray-200 dark:border-gray-700">Serial Number</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-700">Item QR Code</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-700">Status</th>
-                            <th class="p-3 border border-gray-200 dark:border-gray-700">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700 text-gray-800 dark:text-gray-200">
-                        @forelse($asset->items as $item)
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition {{ $item->status == 'out' ? 'opacity-60 bg-gray-50 dark:bg-gray-900/40' : '' }}">
-                            <td class="p-3 border border-gray-200 dark:border-gray-700 font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{{ $item->serial_number }}</td>
-                            
-                            <td class="p-3 border border-gray-200 dark:border-gray-700 cursor-pointer group text-center"
-                                @click="activeModalId = 'modal-{{ $item->id }}'">
-                                <div class="flex flex-col items-center justify-center">
-                                    <div class="w-16 h-16 [&>svg]:w-full [&>svg]:h-full bg-white p-1 rounded shadow-sm group-hover:ring-2 group-hover:ring-indigo-500 transition">
-                                        {!! $item->qr_code !!}
-                                    </div>
-                                    <span class="text-[10px] text-blue-500 dark:text-blue-400 group-hover:underline block mt-1">🔍 Click to view</span>
-                                </div>
-                            </td>
-                            
-                            <td class="p-3 border border-gray-200 dark:border-gray-700">
-                                <span class="px-2.5 py-1 text-xs font-semibold rounded 
-                                    @if($item->status == 'available') bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-300
-                                    @elseif($item->status == 'maintenance') bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300
-                                    @elseif($item->status == 'failed') bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-300
-                                    @else bg-gray-100 dark:bg-gray-900/60 text-gray-800 dark:text-gray-300 @endif">
-                                    {{ ucfirst($item->status) }}
-                                </span>
-                            </td>
+     <!-- 💡 Individual Items & QR Codes (Table View for Report) -->
+<div id="main-report-section" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md space-y-4 border border-gray-100 dark:border-gray-700 transition-colors duration-200">
+    <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">Individual Items & QR Codes (Serial Level)</h2>
+    
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse border border-gray-200 dark:border-gray-700 text-sm">
+            <thead>
+                <tr class="bg-gray-100 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                    <th class="p-3 border border-gray-200 dark:border-gray-700">Serial Number</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-700">Item QR Code</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-700">Status</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-700">Assigned Employee</th>
+                    <th class="p-3 border border-gray-200 dark:border-gray-700">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700 text-gray-800 dark:text-gray-200">
+                @forelse($items as $item)
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition {{ $item->status == 'out' ? 'opacity-60 bg-gray-50 dark:bg-gray-900/40' : '' }}">
+                    <td class="p-3 border border-gray-200 dark:border-gray-700 font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{{ $item->serial_number }}</td>
+                    
+                    <td class="p-3 border border-gray-200 dark:border-gray-700 cursor-pointer group text-center"
+                        @click="activeModalId = 'modal-{{ $item->id }}'">
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="w-16 h-16 [&>svg]:w-full [&>svg]:h-full bg-white p-1 rounded shadow-sm group-hover:ring-2 group-hover:ring-indigo-500 transition">
+                                {!! $item->qr_code !!}
+                            </div>
+                            <span class="text-[10px] text-blue-500 dark:text-blue-400 group-hover:underline block mt-1">🔍 Click to view</span>
+                        </div>
+                    </td>
+                    
+                    <td class="p-3 border border-gray-200 dark:border-gray-700">
+                        <span class="px-2.5 py-1 text-xs font-semibold rounded 
+                            @if($item->status == 'available') bg-green-100 dark:bg-green-900/60 text-green-800 dark:text-green-300
+                            @elseif($item->status == 'maintenance') bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300
+                            @elseif($item->status == 'failed') bg-red-100 dark:bg-red-900/60 text-red-800 dark:text-red-300
+                            @else bg-gray-100 dark:bg-gray-900/60 text-gray-800 dark:text-gray-300 @endif">
+                            {{ ucfirst($item->status) }}
+                        </span>
+                    </td>
 
-                            <td class="p-3 border border-gray-200 dark:border-gray-700">
-                                @if($item->status == 'available' || $item->status == 'maintenance')
-                                    <!-- Maintenance (Secondary Slate / Gray) -->
-                                    <a href="{{ route('assets.maintenances.index', $item->id) }}" class="inline-block bg-slate-700 hover:bg-slate-800 text-white font-semibold py-1.5 px-3 rounded text-xs transition shadow-sm">
-                                        🛠️ Maintenance
-                                    </a>
-                                @elseif($item->status == 'failed')
-                                    <!-- Retry Maintenance (Warning Amber Tone) -->
-                                    <a href="{{ route('assets.maintenances.index', $item->id) }}" class="inline-block bg-amber-500 hover:bg-amber-600 text-white font-semibold py-1.5 px-3 rounded text-xs transition shadow-sm">
-                                        🛠️ Retry Maintenance
-                                    </a>
-                                @else
-                                    <span class="text-xs text-gray-400 dark:text-gray-500 italic">Checked Out</span>
-                                @endif
-                            </td>
-                        </tr>
-                        @empty
-                        <tr>
-                            <td colspan="4" class="p-6 border border-gray-200 dark:border-gray-700 text-center text-gray-400 dark:text-gray-500">No individual items registered for this asset.</td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                        @if(auth()->user()->role === 'admin')
+                            {{-- Admin ဖြစ်မှသာ Dropdown နှင့် Auto-submit Form ကို မြင်ရမည် --}}
+                            <form action="{{ route('asset-items.assign', $item->id) }}" method="POST" class="flex justify-center items-center w-full">
+                                @csrf
+                                <select name="assigned_to" 
+                                        onchange="this.form.submit()"
+                                        class="text-xs rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 py-1.5 px-3 w-full max-w-[160px] text-center shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">-- Unassigned --</option>
+                                    @foreach($users as $user)
+                                        <option value="{{ $user->id }}" {{ $item->assigned_to == $user->id ? 'selected' : '' }}>
+                                            {{ $user->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @else
+                            {{-- Staff ဖြစ်ပါက Assigned လုပ်ထားသူ၏ နာမည်ကို စာသားသက်သက်သာ ပြမည် --}}
+                            <span class="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                {{ $item->assignee->name ?? '-- Unassigned --' }}
+                            </span>
+                        @endif
+                    </td>
 
-            </div>
-            
-        </div>
+                    <td class="p-3 border border-gray-200 dark:border-gray-700">
+                        @if($item->status == 'available' || $item->status == 'maintenance')
+                            <a href="{{ route('assets.maintenances.index', $item->id) }}" class="inline-block bg-slate-700 hover:bg-slate-800 text-white font-semibold py-1.5 px-3 rounded text-xs transition shadow-sm">
+                                🛠️ Maintenance
+                            </a>
+                        @elseif($item->status == 'failed')
+                            <a href="{{ route('assets.maintenances.index', $item->id) }}" class="inline-block bg-amber-500 hover:bg-amber-600 text-white font-semibold py-1.5 px-3 rounded text-xs transition shadow-sm">
+                                🛠️ Retry Maintenance
+                            </a>
+                        @else
+                            <span class="text-xs text-gray-400 dark:text-gray-500 italic">Checked Out</span>
+                        @endif
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="5" class="p-6 border border-gray-200 dark:border-gray-700 text-center text-gray-400 dark:text-gray-500">No individual items registered for this asset.</td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 💡 Pagination Links -->
+    <div class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+        {{ $items->links() }}
+    </div>
+    
+</div>
+
+
 
         <!-- 🏷️ QR Code Stickers Grid Section -->
         <div id="qr-sticker-section" style="display: none;">
@@ -326,11 +365,18 @@
                         class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition flex items-center gap-2">
                     🔄 Stock Movement
                 </button>
+                <!--  <button @click="activeTab = 'assign'" 
+                :class="activeTab === 'assign' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-gray-800 font-bold border-b-2' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition flex items-center gap-2 whitespace-nowrap">
+                 👤 Employee Assignment
+                </button> -->
+                @if(auth()->user()->role === 'admin')
                 <button @click="activeTab = 'transfer'" 
-                        :class="activeTab === 'transfer' ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-white dark:bg-gray-800 font-bold border-b-2' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
-                        class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition flex items-center gap-2">
-                    🚚 Warehouse Transfer
-                </button>
+                 :class="activeTab === 'transfer' ? 'border-amber-500 text-amber-600 dark:text-amber-400 bg-white dark:bg-gray-800 font-bold border-b-2' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                 class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition flex items-center gap-2">
+               🚚 Warehouse Transfer
+               </button>
+               @endif
                 <button @click="activeTab = 'history'" 
                         :class="activeTab === 'history' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-gray-800 font-bold border-b-2' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
                         class="px-4 py-2.5 text-sm font-medium rounded-t-lg transition flex items-center gap-2">
@@ -403,7 +449,41 @@
                 </form>
             </div>
 
-            <!-- 2. 🚚 Asset Transfer Card -->
+            <!-- 2. 👤 Employee Assignment Section (NEW TAB) -->
+            <div x-show="activeTab === 'assign'" x-transition 
+                 class="bg-white dark:bg-gray-800 p-6 rounded-b-lg rounded-tr-lg shadow-md space-y-4 border border-gray-100 dark:border-gray-700 transition-colors duration-200"
+                 style="display: none;">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">👤 Assign Asset to Employee</h2>
+
+                @if(session('success'))
+                    <div class="bg-green-100 dark:bg-green-900/50 border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 px-4 py-3 rounded text-sm">
+                        {{ session('success') }}
+                    </div>
+                @endif
+
+                <form action="{{ route('assets.assign', $asset->id) }}" method="POST" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label for="assigned_to" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Employee / User</label>
+                        <select name="assigned_to" id="assigned_to" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 rounded-md p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Unassigned --</option>
+                            @foreach($users as $user)
+                                <option value="{{ $user->id }}" {{ $asset->assigned_to == $user->id ? 'selected' : '' }}>
+                                    {{ $user->name }} ({{ $user->email }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-md text-sm transition shadow-sm">
+                            Update Assignment
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 3. 🚚 Asset Transfer Card -->
             <div x-show="activeTab === 'transfer'" x-transition 
                  class="bg-white dark:bg-gray-800 p-6 rounded-b-lg rounded-tr-lg shadow-md space-y-4 border border-gray-100 dark:border-gray-700 transition-colors duration-200"
                  style="display: none;">
@@ -470,7 +550,7 @@
                 </form>
             </div>
 
-            <!-- 3. Transaction History Table -->
+            <!-- 4. Transaction History Table -->
             <div x-show="activeTab === 'history'" x-transition 
                  class="bg-white dark:bg-gray-800 p-6 rounded-b-lg rounded-tr-lg shadow-md space-y-4 border border-gray-100 dark:border-gray-700 transition-colors duration-200"
                  style="display: none;">

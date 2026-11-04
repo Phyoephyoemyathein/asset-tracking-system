@@ -15,6 +15,11 @@ class AssetTransferController extends Controller
 {
     public function store(Request $request, Asset $asset)
     {
+        // Admin မဟုတ်လျှင် ခွင့်မပြုပါ
+    if (auth()->user()->role !== 'admin') {
+        abort(403, 'Unauthorized action. Only administrators can perform warehouse transfers.');
+    }
+
         $request->validate([
             'to_warehouse_id' => 'required|exists:warehouses,id|different:' . $asset->warehouse_id,
             'serial_ids' => 'required|array',
