@@ -58,5 +58,17 @@ Follow these steps to set up the project locally on your machine:
     ```bash
    php artisan serve
 7. **Access the application:**
-   Open your browser and navigate to http://127.0.0.1:8000   
+   Open your browser and navigate to http://127.0.0.1:8000
+
+   ---
+   
+## 📞 Contact
+
+If you have any questions, suggestions, or would like to collaborate, feel free to reach out to me!
+
+* **GitHub:** [Phyoephyoemyathein](https://github.com/Phyoephyoemyathein)
+* **Email:** [phyoe572015@gmail.com](mailto:phyoe572015@gmail.com)
+* **LinkedIn:** [linkedin.com/in/phyophyomyathein96](https://www.linkedin.com/in/phyophyomyathein96/)
+
+*Developed by Phyoe Phyo Mya Thein*
    
