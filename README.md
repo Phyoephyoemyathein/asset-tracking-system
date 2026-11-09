@@ -40,13 +40,14 @@ Follow these steps to set up the project locally on your machine:
    
 
 2. Install PHP dependencies:
-   composer install
+ ```bash
+  composer install
 
-3. Configure environment file:
+4. Configure environment file:
    cp .env.example .env
    php artisan key:generate
 
-4. Configure your database settings in .env:
+5. Configure your database settings in .env:
    DB_CONNECTION=mysql
    DB_HOST=127.0.0.1
    DB_PORT=3306
@@ -54,13 +55,13 @@ Follow these steps to set up the project locally on your machine:
    DB_USERNAME=your_database_user
    DB_PASSWORD=your_database_password
 
-5. Run migrations and seeders:
+6. Run migrations and seeders:
    php artisan migrate --seed
 
-6. Start the local development server:
+7. Start the local development server:
    php artisan serve
 
-7. Access the application:
+8. Access the application:
    Open your browser and navigate to http://127.0.0.1:8000
 
 ---
