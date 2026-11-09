@@ -14,7 +14,7 @@ A robust, feature-rich inventory and warehouse management web application built 
 - **📜 Transaction History:** Detailed logs of asset movements and quantity changes over time.
 - **🔍 Advanced Filtering & Search:** Filter inventory by categories, warehouses, date ranges, and custom keyword searches (Name/SKU).
 - **📄 Professional Reporting & Export:** Generate structured PDF stock summaries, monthly/yearly movement reports, and Excel exports.
-- **⚠️ Low Stock Alerts:** Automated warnings highlighting assets running at or below minimum stock levels.
+- **⚠️ Low Stock Alerts & Email Notifications:** Automated warnings highlighting assets running at or below minimum stock levels, with instant email notifications sent to administrators (integrated via Mailtrap for testing).sent to administrators (configured with Mailtrap for development testing).
 - **👥 Role-Based Access Control (RBAC):** Distinct permissions for `Admin` and `Staff` roles.
 - **🌙 Dark Mode Support:** Seamless toggle between light and dark themes using Tailwind CSS and Alpine.js.
 
@@ -24,7 +24,7 @@ A robust, feature-rich inventory and warehouse management web application built 
 
 - **Backend:** PHP 8+, Laravel Framework, Eloquent ORM
 - **Frontend:** Tailwind CSS, Alpine.js, Blade Templates, Vite
-- **Data Visualization & Scanning:** Chart.js, HTML5-QRCode
+- **Data Visualization & Scanning:** Chart.js, HTML5-QRCode, Mailtrap (Email Testing)
 - **Database & Version Control:** MySQL, Git & GitHub
 
 ---
@@ -42,6 +42,16 @@ cp .env.example .env
 php artisan key:generate
 php artisan migrate
 php artisan serve
+
+# Mailtrap Configuration for Low Stock Alerts
+MAIL_MAILER=smtp
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=your_mailtrap_username
+MAIL_PASSWORD=your_mailtrap_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 
 ## 🗄️ Database Setup
