@@ -33,7 +33,43 @@ A robust, feature-rich web application built with **PHP Laravel**, **Tailwind CS
 
 Follow these steps to set up the project locally on your machine:
 
-1. **Clone the repository:**
-   ```bash
-   git clone [https://github.com/Phyoephyoemyathein/asset-tracking-system.git](https://github.com/Phyoephyoemyathein/asset-tracking-system.git)
+1. Clone the repository:
+   git clone https://github.com/Phyoephyoemyathein/asset-tracking-system.git
    cd asset-tracking-system
+
+2. Install PHP dependencies:
+   composer install
+
+3. Configure environment file:
+   cp .env.example .env
+   php artisan key:generate
+
+4. Configure your database settings in .env:
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=your_database_name
+   DB_USERNAME=your_database_user
+   DB_PASSWORD=your_database_password
+
+5. Run migrations and seeders:
+   php artisan migrate --seed
+
+6. Start the local development server:
+   php artisan serve
+
+7. Access the application:
+   Open your browser and navigate to http://127.0.0.1:8000
+
+---
+
+## 📸 Screenshots
+
+*(You can add screenshots of your Dashboard, QR Scanner, Activity Logs, and Reports pages here to make your repository look more professional!)*
+
+---
+
+## 👨‍💻 Author
+
+* **Phyoe Phyoe Mya Thein**
+* GitHub: [@Phyoephyoemyathein](https://github.com/Phyoephyoemyathein)
