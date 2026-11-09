@@ -42,3 +42,35 @@ cp .env.example .env
 php artisan key:generate
 php artisan migrate --seed
 php artisan serve
+```
+
+## 🗄️ Database Setup
+To set up the database for this project, follow these steps:
+
+1. **Create Database:**
+Create a new MySQL database in your local environment (e.g., using phpMyAdmin, Laragon, or MySQL Workbench) named `asset_tracking_db` (or any name you prefer).
+
+2. **Configure Environment:**
+Locate the `.env` file in your project root folder. Open it and update your database connection details:
+ ```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=asset_tracking_db
+DB_USERNAME=your_database_username
+DB_PASSWORD=your_database_password
+```
+3. **Run Migrations:**
+Open your terminal in the project directory and run the following command to create the necessary tables:
+```bash
+php artisan migrate
+```
+## 📞 Contact
+
+If you have any questions, suggestions, or would like to collaborate, feel free to reach out to me!
+
+* **GitHub:** [Phyoephyoemyathein](https://github.com/Phyoephyoemyathein)
+* **Email:** [phyoe572015@gmail.com](mailto:phyoe572015@gmail.com)
+* **LinkedIn:** [linkedin.com/in/phyophyomyathein96](https://www.linkedin.com/in/phyophyomyathein96/)
+---
+*Developed by Phyoe Phyo Mya Thein*
