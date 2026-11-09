@@ -40,7 +40,7 @@ composer install
 npm install && npm run build
 cp .env.example .env
 php artisan key:generate
-php artisan migrate
+php artisan migrate --seed
 php artisan serve
 
 
@@ -75,7 +75,7 @@ MAIL_FROM_NAME="${APP_NAME}"
 3. **Run Migrations:**
 Open your terminal in the project directory and run the following command to create the necessary tables:
 ```bash
-php artisan migrate
+php artisan migrate --seed
 ```
 ## 📞 Contact
 
