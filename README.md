@@ -34,8 +34,10 @@ A robust, feature-rich web application built with **PHP Laravel**, **Tailwind CS
 Follow these steps to set up the project locally on your machine:
 
 1. Clone the repository:
-   git clone https://github.com/Phyoephyoemyathein/asset-tracking-system.git
+   ```bash
+   git clone [https://github.com/Phyoephyoemyathein/asset-tracking-system.git](https://github.com/Phyoephyoemyathein/asset-tracking-system.git)
    cd asset-tracking-system
+   
 
 2. Install PHP dependencies:
    composer install
