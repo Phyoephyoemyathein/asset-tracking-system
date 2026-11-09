@@ -36,13 +36,16 @@ Follow these steps to set up the project locally on your machine:
    ```bash
    git clone [https://github.com/Phyoephyoemyathein/asset-tracking-system.git](https://github.com/Phyoephyoemyathein/asset-tracking-system.git)
    cd asset-tracking-system
+   ```
 2. **Install PHP dependencies:**
    ```bash
    composer install
+   ```
 3. **Configure environment file:**
    ```bash
    cp .env.example .env
    php artisan key:generate
+   ```
 4. **Configure your database settings in .env:**
     ```bash
    DB_CONNECTION=mysql
@@ -51,12 +54,15 @@ Follow these steps to set up the project locally on your machine:
    DB_DATABASE=your_database_name
    DB_USERNAME=your_database_user
    DB_PASSWORD=your_database_password
+    ```
 5. **Run migrations and seeders:**
     ```bash
    php artisan migrate --seed
+    ```
 6. **Start the local development server:**
     ```bash
    php artisan serve
+    ```
 7. **Access the application:**
    Open your browser and navigate to http://127.0.0.1:8000
 
