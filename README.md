@@ -14,7 +14,7 @@ A robust, feature-rich inventory and warehouse management web application built 
 - **📜 Transaction History:** Detailed logs of asset movements and quantity changes over time.
 - **🔍 Advanced Filtering & Search:** Filter inventory by categories, warehouses, date ranges, and custom keyword searches (Name/SKU).
 - **📄 Professional Reporting & Export:** Generate structured PDF stock summaries, monthly/yearly movement reports, and Excel exports.
-- **⚠️ Low Stock Alerts & Email Notifications:** Automated warnings highlighting assets running at or below minimum stock levels, with instant email notifications sent to administrators (integrated via Mailtrap for testing).sent to administrators (configured with Mailtrap for development testing).
+- **⚠️ Low Stock Alerts & Email Notifications:** Automated warnings highlighting assets running at or below minimum stock levels, with instant email notifications sent to administrators (configured with Mailtrap for development testing).
 - **👥 Role-Based Access Control (RBAC):** Distinct permissions for `Admin` and `Staff` roles.
 - **🌙 Dark Mode Support:** Seamless toggle between light and dark themes using Tailwind CSS and Alpine.js.
 
@@ -43,15 +43,7 @@ php artisan key:generate
 php artisan migrate
 php artisan serve
 
-# Mailtrap Configuration for Low Stock Alerts
-MAIL_MAILER=smtp
-MAIL_HOST=sandbox.smtp.mailtrap.io
-MAIL_PORT=2525
-MAIL_USERNAME=your_mailtrap_username
-MAIL_PASSWORD=your_mailtrap_password
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS="hello@example.com"
-MAIL_FROM_NAME="${APP_NAME}"
+
 ```
 
 ## 🗄️ Database Setup
@@ -69,6 +61,16 @@ DB_PORT=3306
 DB_DATABASE=asset_tracking_db
 DB_USERNAME=your_database_username
 DB_PASSWORD=your_database_password
+
+# Mailtrap Configuration for Low Stock Alerts
+MAIL_MAILER=smtp
+MAIL_HOST=sandbox.smtp.mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=your_mailtrap_username
+MAIL_PASSWORD=your_mailtrap_password
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 3. **Run Migrations:**
 Open your terminal in the project directory and run the following command to create the necessary tables:
