@@ -87,12 +87,15 @@ class AssetController extends Controller
             return $availableCount <= $asset->min_stock_level;
         });
 
+        // 💻 Screen ပေါ်တွင် ပြရန် Pagination (5 ခုစီ)
         $assets = $query->latest()->paginate(5)->withQueryString();
+       
+     
         $categories = Category::all();
         $warehouses = Warehouse::all();
 
         return view('assets', compact(
-            'assets', 
+            'assets',
             'categories', 
             'warehouses', 
             'totalAssets', 
@@ -206,8 +209,21 @@ class AssetController extends Controller
     
     $asset->available_total_quantity = $asset->items()->where('status', 'Available')->count();
     
-    // 💡 အဓိကပြင်ဆင်ရန် - latest() အစား orderBy('serial_number', 'asc') ဖြင့် အစဉ်လိုက် စီပေးပါ
-    $items = $asset->items()->with(['maintenances', 'assignee'])->orderBy('serial_number', 'asc')->paginate(5);
+    // 💡 Database မှ Item အားလုံးကို အရင်ယူမည်
+    $allItems = $asset->items()->with(['maintenances', 'assignee'])->orderBy('serial_number', 'asc')->get();
+    
+    // 💡 Screen ပေါ်တွင် 5 ခုစီ Page ခွဲပြရန် Collection Pagination ကို သုံးမည်
+    $currentPage = \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPage();
+    $perPage = 5;
+    $currentItems = $allItems->slice(($currentPage - 1) * $perPage, $perPage)->values();
+    
+    $items = new \Illuminate\Pagination\LengthAwarePaginator(
+        $currentItems,
+        $allItems->count(),
+        $perPage,
+        $currentPage,
+        ['path' => \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPath()]
+    );
     
     $warehouses = Warehouse::all();
     $users = \App\Models\User::all();
@@ -220,7 +236,7 @@ class AssetController extends Controller
 
     $transactions = $transactionsQuery->latest()->get();
 
-    return view('show', compact('asset', 'items', 'warehouses', 'transactions', 'users'));
+    return view('show', compact('asset', 'items', 'allItems', 'warehouses', 'transactions', 'users'));
 }
 
 
@@ -241,49 +257,84 @@ class AssetController extends Controller
 
 
 
-    public function update(Request $request, $id)
-    {
-        if (!auth()->check() || !auth()->user()->isAdmin()) {
-            abort(403, 'Unauthorized action. Only Admin can update assets.');
-        }
+public function update(Request $request, $id)
+{
+    if (!auth()->check() || !auth()->user()->isAdmin()) {
+        abort(403, 'Unauthorized action. Only Admin can update assets.');
+    }
 
-        $asset = Asset::findOrFail($id);
+    $asset = Asset::with(['category', 'warehouse'])->findOrFail($id);
 
-        $validated = $request->validate([
-            'category_id'     => 'required|exists:categories,id',
-            'warehouse_id'    => 'required|exists:warehouses,id',
-            'name'            => 'required|string|max:255',
-            'sku'             => [
-                'required',
-                'string',
-                \Illuminate\Validation\Rule::unique('assets', 'sku')
-                    ->ignore($id)
-                    ->where(function ($query) use ($request) {
-                        return $query->where('warehouse_id', $request->warehouse_id);
-                    }),
-            ],
-            'min_stock_level' => 'required|integer|min:0',
-        ]);
+    $validated = $request->validate([
+        'category_id'     => 'required|exists:categories,id',
+        'warehouse_id'    => 'required|exists:warehouses,id',
+        'name'            => 'required|string|max:255',
+        'sku'             => [
+            'required',
+            'string',
+            \Illuminate\Validation\Rule::unique('assets', 'sku')
+                ->ignore($id)
+                ->where(function ($query) use ($request) {
+                    return $query->where('warehouse_id', $request->warehouse_id);
+                }),
+        ],
+        'min_stock_level' => 'required|integer|min:0',
+    ]);
 
-        $oldName = $asset->name;
-        
-        $asset->update($validated);
+    // 💡 ပြောင်းလဲမှုများကို တိုက်ဆိုင်စစ်ဆေးရန် အဟောင်းများကို သိမ်းထားမည်
+    $oldName = $asset->name;
+    $oldSku = $asset->sku;
+    $oldMinStock = (int) $asset->min_stock_level;
+    $oldCategoryId = $asset->category_id;
+    $oldWarehouseId = $asset->warehouse_id;
 
-        // 💡 Update လုပ်ပြီးချိန်တွင် Low Stock ဖြစ်ပါက Login ဝင်ထားသော Admin ၏ Email ဆီသို့ ပို့မည်
+    $asset->fill($validated);
+
+    if ($asset->isDirty()) {
+        $asset->save();
+        $asset->load(['category', 'warehouse']);
+
+        // Low Stock Email Check
         $availableCount = $asset->items()->where('status', 'available')->count();
         if ($availableCount <= $asset->min_stock_level) {
             Mail::to(auth()->user()->email)->send(new LowStockNotification($asset));
         }
 
+        // 💡 တကယ်ပြောင်းလဲသွားသော Fields များကိုသာ တိတိကျကျ စစ်ဆေး၍ ထည့်မည်
+        $changes = [];
+        
+        if ($oldName !== $asset->name) {
+            $changes[] = 'name from "' . $oldName . '" to "' . $asset->name . '"';
+        }
+        if ($oldSku !== $asset->sku) {
+            $changes[] = 'SKU from "' . $oldSku . '" to "' . $asset->sku . '"';
+        }
+        if ($oldMinStock !== (int) $asset->min_stock_level) {
+            $changes[] = 'min stock level from ' . $oldMinStock . ' to ' . $asset->min_stock_level;
+        }
+        if ($oldCategoryId != $asset->category_id) {
+            $oldCatName = \App\Models\Category::find($oldCategoryId)->name ?? 'N/A';
+            $changes[] = 'category from "' . $oldCatName . '" to "' . ($asset->category->name ?? 'N/A') . '"';
+        }
+        if ($oldWarehouseId != $asset->warehouse_id) {
+            $oldWhName = \App\Models\Warehouse::find($oldWarehouseId)->name ?? 'N/A';
+            $changes[] = 'warehouse from "' . $oldWhName . '" to "' . ($asset->warehouse->name ?? 'N/A') . '"';
+        }
+
+        $descriptionText = count($changes) > 0 
+            ? auth()->user()->name . ' updated asset "' . $asset->name . '": changed ' . implode(', ', $changes)
+            : auth()->user()->name . ' updated asset: ' . $asset->name;
+
         ActivityLog::create([
             'user_id'     => auth()->id(),
             'action'      => 'Updated',
             'subject'     => 'Asset',
-            'description' => auth()->user()->name . ' updated asset from "' . $oldName . '" to "' . $asset->name . '" (SKU: ' . $asset->sku . ')'
+            'description' => $descriptionText
         ]);
-
-        return redirect()->to('/dashboard')->with('success', 'Asset updated successfully!');
     }
+
+    return redirect()->to('/dashboard')->with('success', 'Asset updated successfully!');
+}
 
 
 
@@ -398,23 +449,34 @@ class AssetController extends Controller
 
             $name = trim($row[0]);
             $sku = trim($row[1]);
-            $categoryId = trim($row[2]);
-            $warehouseId = trim($row[3]);
+            $categoryName = trim($row[2]);   // CSV မှ Category Name
+            $warehouseName = trim($row[3]); // CSV မှ Warehouse Name
             $quantity = (int)$row[4];
             $minStockLevel = (int)$row[5];
+
+            // 1. Category ကို နာမည်ဖြင့် ရှာမည် (မရှိလျှင် အသစ်မဆောက်ပါ)
+$category = \App\Models\Category::where('name', $categoryName)->first();
+
+// 2. Warehouse ကို နာမည်ဖြင့် ရှာမည် (မရှိလျှင် အသစ်မဆောက်ပါ)
+$warehouse = \App\Models\Warehouse::where('name', $warehouseName)->first();
+
+// အကယ်၍ Category သို့မဟုတ် Warehouse မတွေ့ပါက ဤ Row ကို ကျော်မည် (Skip)
+if (!$category || !$warehouse) {
+    continue; 
+}
 
             // 💡 Asset တစ်ခုလုံးအတွက် QR Code ဂျင်နရေတာ လုပ်ခြင်း
             $assetQrSvg = QrCode::size(200)->generate($sku);
 
-            // Asset ကို ဖန်တီးခြင်း သို့မဟုတ် ရှာဖွေခြင်း (qr_code ကိုပါ ထည့်သွင်းရန်)
+            // Asset ကို ဖန်တီးခြင်း သို့မဟုတ် ရှာဖွေခြင်း
             $asset = Asset::firstOrCreate(
                 ['sku' => $sku],
                 [
                     'name' => $name,
-                    'category_id' => $categoryId,
-                    'warehouse_id' => $warehouseId,
+                    'category_id' => $category->id,     // 👈 Correct ID from Category Name
+                    'warehouse_id' => $warehouse->id,   // 👈 Correct ID from Warehouse Name
                     'min_stock_level' => $minStockLevel,
-                    'qr_code' => $assetQrSvg, // 👈 ဤနေရာတွင် Asset QR Code ထည့်ရန်
+                    'qr_code' => $assetQrSvg,
                 ]
             );
 
@@ -450,15 +512,16 @@ public function downloadSampleCsv()
         'Content-Disposition' => 'attachment; filename="sample_assets_import.csv"',
     ];
 
-    $columns = ['Name', 'SKU', 'Category ID', 'Warehouse ID', 'Quantity', 'Min Stock Level'];
+    // ID များအစား Name များကို Header တွင် သုံးပေးခြင်း
+    $columns = ['Name', 'SKU', 'Category Name', 'Warehouse Name', 'Quantity', 'Min Stock Level'];
 
     $callback = function() use ($columns) {
         $file = fopen('php://output', 'w');
         fputcsv($file, $columns);
 
-        // Sample Data rows
-        fputcsv($file, ['Dell XPS 15 Laptop', 'LAP-DELL-001', '1', '1', '5', '2']);
-        fputcsv($file, ['Logitech MX Master 3', 'MSE-LOG-002', '2', '1', '10', '3']);
+        // ID အစား User နားလည်လွယ်မည့် နာမည် အစစ်အမှန်များဖြင့် Sample ထည့်ပေးခြင်း
+        fputcsv($file, ['Dell XPS 15 Laptop', 'LAP-DELL-001', 'IT Equipments', 'Main Warehouse', '5', '2']);
+        fputcsv($file, ['Logitech MX Master 3', 'MSE-LOG-002', 'General Equipments', 'IT Warehouse', '10', '3']);
         
         fclose($file);
     };
@@ -544,17 +607,55 @@ public function downloadSampleCsv()
 
 public function assignItem(Request $request, $id)
 {
-   if (auth()->user()->role !== 'admin') {
+    if (auth()->user()->role !== 'admin') {
         abort(403, 'Unauthorized action. Admin access only.');
     }
 
-    $item = \App\Models\AssetItem::findOrFail($id);
+    $item = \App\Models\AssetItem::with('assignee')->findOrFail($id);
     
-    $item->update([
-        'assigned_to' => $request->input('assigned_to')
-    ]);
+    // 💡 Update မလုပ်ခင် အဟောင်းနာမည်ကို အရင်သိမ်းထားပါ
+    $oldAssigneeName = $item->assignee ? $item->assignee->name : 'Unassigned';
+
+    $newAssigneeId = $request->input('assigned_to');
+
+    // အသစ်ရွေးလိုက်သော User ၏ နာမည်ကို ရှာရန်
+    $newAssigneeName = 'Unassigned';
+    if (!empty($newAssigneeId)) {
+        $user = \App\Models\User::find($newAssigneeId);
+        if ($user) {
+            $newAssigneeName = $user->name;
+        }
+    }
+
+    // 💡 အချက်အလက် တကယ်ပြောင်းလဲမှသာ Update လုပ်မည်
+    if ($item->assigned_to != $newAssigneeId) {
+        $item->update([
+            'assigned_to' => $newAssigneeId
+        ]);
+
+        ActivityLog::create([
+            'user_id'     => auth()->id(),
+            'action'      => 'Assigned',
+            'subject'     => 'Asset Item',
+            'description' => auth()->user()->name . ' assigned serial item ' . $item->serial_number . ' from ' . $oldAssigneeName . ' to ' . $newAssigneeName
+        ]);
+    }
 
     return back()->with('success', 'Serial item assigned successfully!');
+}
+
+
+public function printAll()
+{
+    
+    $assets = Asset::with(['category', 'warehouse'])
+                ->withCount('items')
+                ->withCount(['items as available_items_count' => function ($query) {
+                    $query->where('status', 'available');
+                }])
+                ->get();
+
+    return view('print', compact('assets'));
 }
 
 

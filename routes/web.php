@@ -45,6 +45,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/assets/sku/{sku}', [AssetController::class, 'bySku'])->name('assets.by-sku');
 
+    Route::get('/assets/print-all', [AssetController::class, 'printAll'])->name('assets.printAll');
+
     // Asset CRUD & Dynamic Parameter Routes (Below static routes)
     Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
     Route::get('/assets/{asset}', [AssetController::class, 'show'])->name('assets.show');
@@ -58,6 +60,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/assets/{asset}/maintenances', [AssetMaintenanceController::class, 'store'])->name('assets.maintenances.store');
     Route::delete('/assets/maintenances/{id}', [AssetMaintenanceController::class, 'destroy'])->name('assets.maintenances.destroy');
     Route::put('/assets/maintenances/{id}', [AssetMaintenanceController::class, 'update'])->name('assets.maintenances.update');
+
+    Route::get('/scanner', [AssetController::class, 'scanner'])->name('scanner.index');
+    Route::get('/reports', [AssetController::class, 'reports'])->name('reports.index');
     
     // Activity Logs
     Route::get('/activity-logs', [AssetController::class, 'activityLogs'])->name('activity.logs')->middleware('auth');

@@ -61,23 +61,30 @@ class AssetMaintenanceController extends Controller
 public function update(Request $request, $id)
 {
     $request->validate([
-        'status' => 'required|string',
-        'action_text' => 'nullable|string',
+        'issue_description' => 'required|string|max:255',
+        'action_text'       => 'nullable|string',
+        'cost'              => 'nullable|numeric|min:0',
+        'reported_date'     => 'required|date',
+        'status'            => 'required|string',
     ]);
 
     $maintenance = AssetMaintenance::findOrFail($id);
 
+    // Issue, Action, Cost, Status နဲ့ Date အားလုံးကို Update လုပ်ရန်
     $maintenance->update([
-        'status' => $request->status,
-        'action_taken' => $request->action_text,
-        'completed_date' => $request->status == 'completed' ? now() : null,
+        'issue_description' => $request->issue_description,
+        'action_taken'      => $request->action_text,
+        'cost'              => $request->cost ?? 0,
+        'status'            => $request->status,
+        'reported_date'     => $request->reported_date,
+        'completed_date'    => $request->status == 'completed' ? now() : null,
     ]);
 
-   // ပစ္စည်း၏ status ကိုပါ အလိုအလျောက် ချိန်ညှိရန်
+    // ပစ္စည်း၏ status ကိုပါ အလိုအလျောက် ချိန်ညှိရန်
     if ($request->status == 'completed') {
         $maintenance->assetItem()->update(['status' => 'available']);
     } elseif ($request->status == 'failed') {
-        $maintenance->assetItem()->update(['status' => 'failed']); // 💡 $item အစား $maintenance->assetItem() ကို သုံးရန်
+        $maintenance->assetItem()->update(['status' => 'failed']);
     } else {
         $maintenance->assetItem()->update(['status' => 'maintenance']);
     }
