@@ -34,7 +34,7 @@ A robust, feature-rich inventory and warehouse management web application built 
 To run this project on your local machine, follow these steps:
 
 ```bash
-git clone [https://github.com/Phyoephyoemyathein/asset-tracking-system.git](https://github.com/Phyoephyoemyathein/asset-tracking-system.git)
+git clone git clone https://github.com/Phyoephyoemyathein/asset-tracking-system.git
 cd asset-tracking-system
 composer install
 npm install && npm run build
