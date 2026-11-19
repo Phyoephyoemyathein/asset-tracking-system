@@ -86,6 +86,11 @@ If you have any questions, suggestions, or would like to collaborate, feel free 
 * **LinkedIn:** [linkedin.com/in/phyophyomyathein96](https://www.linkedin.com/in/phyophyomyathein96/)
 
 ## 📸 Project Screenshots
+### Dashboard
+![Dashboard](images/dashboard.png)
+
+### Detail
+![Detail](images/detail.png)
 
 ---
 *Developed by Phyoe Phyo Mya Thein*
