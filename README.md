@@ -88,19 +88,14 @@ If you have any questions, suggestions, or would like to collaborate, feel free 
 ## 📸 Project Screenshots
 ### Dashboard
 ![Dashboard](images/dashboard.png)
-
 ### Detail
 ![Detail](images/detail.png)
-
 ### Scanner
 ![Scanner](images/scanner.png)
-
 ### Chart & Advanced PDF Reports
 ![Chart](images/chart.png)
-
 ### Stock Movement, Warehouse Transfer & Transaction History
 ![Feature](images/feature.png)
-
 ### Activity Logs
 ![Log](images/log.png)
 
